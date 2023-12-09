@@ -44,7 +44,6 @@ Here's a densely-connected layer. It has two state variables:
 the variables `w` and `b`.
 """
 
-
 class Linear(keras.layers.Layer):
     def __init__(self, units=32, input_dim=32):
         super().__init__()
@@ -57,7 +56,6 @@ class Linear(keras.layers.Layer):
 
     def call(self, inputs):
         return ops.matmul(inputs, self.w) + self.b
-
 
 """
 You would use a layer by calling it on some tensor input(s), much like a Python
@@ -86,7 +84,6 @@ backpropagation, when you are training the layer.
 Here's how to add and use a non-trainable weight:
 """
 
-
 class ComputeSum(keras.layers.Layer):
     def __init__(self, input_dim):
         super().__init__()
@@ -97,7 +94,6 @@ class ComputeSum(keras.layers.Layer):
     def call(self, inputs):
         self.total.assign_add(ops.sum(inputs, axis=0))
         return self.total
-
 
 x = ops.ones((2, 2))
 my_sum = ComputeSum(2)
@@ -123,7 +119,6 @@ Our `Linear` layer above took an `input_dim` argument that was used to compute
 the shape of the weights `w` and `b` in `__init__()`:
 """
 
-
 class Linear(keras.layers.Layer):
     def __init__(self, units=32, input_dim=32):
         super().__init__()
@@ -137,7 +132,6 @@ class Linear(keras.layers.Layer):
     def call(self, inputs):
         return ops.matmul(inputs, self.w) + self.b
 
-
 """
 In many cases, you may not know in advance the size of your inputs, and you
 would like to lazily create weights when that value becomes known, some time
@@ -146,7 +140,6 @@ after instantiating the layer.
 In the Keras API, we recommend creating layer weights in the
 `build(self, inputs_shape)` method of your layer. Like this:
 """
-
 
 class Linear(keras.layers.Layer):
     def __init__(self, units=32):
@@ -166,9 +159,8 @@ class Linear(keras.layers.Layer):
     def call(self, inputs):
         return ops.matmul(inputs, self.w) + self.b
 
-
 """
-The `__call__()` method of your layer will automatically run build the first time
+The `__call__()` method of your layer will automatically run `build()` the first time
 it is called. You now have a layer that's lazy and thus easier to use:
 """
 
@@ -190,9 +182,16 @@ If you assign a Layer instance as an attribute of another Layer, the outer layer
 will start tracking the weights created by the inner layer.
 
 We recommend creating such sublayers in the `__init__()` method and leave it to
-the first `__call__()` to trigger building their weights.
-"""
+the first `__call__()` to trigger building their weights. However, at times, the
+input shape needs to be known in order to instantiate a sublayer, in which case
+creating them in the `build()` method is necessary.
 
+In either case, though not strictly necessary, it is recommended that the `build()`
+method of sublayers created in a Keras `Layer` or `Model` subclass be called, with
+their respective input shapes, so that `Model.summary()` (after first calling
+`Model.build()`) can report the correct parameter counts prior to the model being
+trained on actual data.
+"""
 
 class MLPBlock(keras.layers.Layer):
     def __init__(self):
@@ -200,6 +199,12 @@ class MLPBlock(keras.layers.Layer):
         self.linear_1 = Linear(32)
         self.linear_2 = Linear(32)
         self.linear_3 = Linear(1)
+
+    # Optional
+    def build(self, input_shape):
+        self.linear_1.build(input_shape)
+        self.linear_2.build((*input_shape[:-1], 32))
+        self.linear_3.build((*input_shape[:-1], 32))
 
     def call(self, inputs):
         x = self.linear_1(inputs)
